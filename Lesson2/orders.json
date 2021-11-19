@@ -1,0 +1,25 @@
+{
+    "orders": [
+        {
+            "item": "Notebook",
+            "quantity": 1,
+            "price": 30000,
+            "buyer": "username",
+            "date": "04.03.2018"
+        },
+        {
+            "item": "Notebook",
+            "quantity": 1,
+            "price": 30000,
+            "buyer": "username",
+            "date": "04.03.2018"
+        },
+        {
+            "item": "Notebook",
+            "quantity": 1,
+            "price": 30000,
+            "buyer": "username",
+            "date": "04.03.2018"
+        }
+    ]
+}
