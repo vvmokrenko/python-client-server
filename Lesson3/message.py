@@ -38,6 +38,9 @@ class Message:
         :return:
         '''
 
+        if not isinstance(message, dict):
+            raise TypeError
+
         js_message = json.dumps(message)
         encoded_message = js_message.encode(ENCODING)
         socketto.send(encoded_message)

@@ -2,6 +2,7 @@
 
 import sys
 import json
+import time
 from common.variables import ACTION, ACCOUNT_NAME, RESPONSE, MAX_CONNECTIONS, \
     PRESENCE, TIME, USER, ERROR, DEFAULT_PORT, RESPONDEFAULT_IP_ADDRESSSE
 from transport import Transport
@@ -34,9 +35,13 @@ class Server(Transport):
         '''
         if ACTION in message and message[ACTION] == PRESENCE and TIME in message \
                 and USER in message and message[USER][ACCOUNT_NAME] == 'Guest':
+
+            if not isinstance(message['time'], float):
+                raise TypeError
+
             return {RESPONSE: 200}
         return {
-            RESPONDEFAULT_IP_ADDRESSSE: 400,
+            RESPONSE: 400,
             ERROR: 'Bad Request'
         }
 
