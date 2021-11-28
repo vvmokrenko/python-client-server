@@ -3,10 +3,12 @@
 import sys
 import json
 import time
+import logs.config_server_log
+from errors import IncorrectDataRecivedError
 from common.variables import ACTION, ACCOUNT_NAME, RESPONSE, MAX_CONNECTIONS, \
     PRESENCE, TIME, USER, ERROR, DEFAULT_PORT, RESPONDEFAULT_IP_ADDRESSSE
 from transport import Transport
-
+import logging
 
 class Server(Transport):
     """
@@ -14,17 +16,17 @@ class Server(Transport):
     """
 
     def __init__(self, ipaddress, port):
+        self.LOGGER = Transport.set_logger_type('server')
         super().__init__(ipaddress, port)
-        print(f'Cлушаем по адресу {self.ipaddress} на порту {self.port}')
+        self.LOGGER.info(f'Сервер подключаем по адресу {ipaddress} на порту {port}')
 
     def init(self):
         self.socket.bind(self.connectstring)
         # Слушаем порт
         self.socket.listen(MAX_CONNECTIONS)
-        print('Сервер начал слушать порт')
+        self.LOGGER.info('Сервер начал слушать порт')
 
-    @staticmethod
-    def process_message(message):
+    def process_message(self, message):
         '''
         Обработчик сообщений от клиентов, принимает словарь -
         сообщение от клинта, проверяет корректность,
@@ -33,6 +35,7 @@ class Server(Transport):
         :param message:
         :return:
         '''
+        self.LOGGER.debug(f'Разбор сообщения от клиента : {message}')
         if ACTION in message and message[ACTION] == PRESENCE and TIME in message \
                 and USER in message and message[USER][ACCOUNT_NAME] == 'Guest':
 
@@ -52,13 +55,22 @@ class Server(Transport):
         '''
         while True:
             client, client_address = self.socket.accept()
+            self.LOGGER.info(f'Установлено соедение с ПК {client_address}')
             try:
-                message_from_cient = self.get(client)
-                response = self.process_message(message_from_cient)
+                message_from_client = self.get(client)
+                self.LOGGER.debug(f'Получено сообщение {message_from_client}')
+                response = self.process_message(message_from_client)
+                self.LOGGER.info(f'Сформирован ответ клиенту {response}')
                 self.send(client, response)
+                self.LOGGER.debug(f'Соединение с клиентом {client_address} закрывается.')
                 client.close()
             except (ValueError, json.JSONDecodeError):
-                print('Принято некорретное сообщение от клиента.')
+                self.LOGGER.error('Принято некорретное сообщение от клиента.'
+                                    f'Соединение закрывается.')
+                client.close()
+            except IncorrectDataRecivedError:
+                self.LOGGER.error(f'От клиента приняты некорректные данные. '
+                                    f'Соединение закрывается.')
                 client.close()
 
 
@@ -78,7 +90,7 @@ def main():
         else:
             listen_port = DEFAULT_PORT
     except IndexError:
-        print('После параметра -\'p\' необходимо указать номер порта.')
+        self.LOGGER.error('После параметра -\'p\' необходимо указать номер порта.')
         sys.exit(1)
 
     # Затем загружаем какой адрес слушать
@@ -88,7 +100,7 @@ def main():
         else:
             listen_address = ''
     except IndexError:
-        print(
+        self.LOGGER.error(
             'После параметра \'a\'- необходимо указать адрес, который будет слушать сервер.')
         sys.exit(1)
 

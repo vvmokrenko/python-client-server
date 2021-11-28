@@ -4,12 +4,14 @@
 import socket
 from abc import ABC, abstractmethod
 from message import Message
-
+import logging
 
 class Transport(ABC):
     """
     Класс определеят общие свойства и методы для клиента и сервера.
     """
+    LOGGER = logging.getLogger('') # инициализируем атрибут класса
+
     # валидируем значения порта
     def __new__(cls, *args, **kwargs):
         try:
@@ -17,10 +19,12 @@ class Transport(ABC):
             if port < 1024 or port > 65535:
                 raise ValueError
         except ValueError:
-            print('В качастве порта может быть указано только число в диапазоне от 1024 до 65535.')
+            cls.LOGGER.critical(
+                f'Попытка запуска клиента с неподходящим номером порта: {port}.'
+                f' Допустимы адреса с 1024 до 65535')
             return -1
         except IndexError:
-            print('Не указан номер порта.')
+            cls.LOGGER.critical('Не указан номер порта.')
             return -1
         #  если значения параметров корреткны создаем объект
         return super().__new__(cls)
@@ -29,7 +33,7 @@ class Transport(ABC):
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.ipaddress = ipaddress
         self.port = int(port)
-        print(f'Создан объект типа {type(self)}, присвоен сокет {self.socket}')
+        self.LOGGER.info(f'Создан объект типа {type(self)}, присвоен сокет {self.socket}')
 
     # Сокет для обмена сообщениями
     @property
@@ -66,3 +70,9 @@ class Transport(ABC):
     @property
     def connectstring(self):
         return (self.ipaddress, self.port)
+
+    # Устнавливаеи тип логгера в зависимости от функции (клиент или сервер)
+    @classmethod
+    def set_logger_type(cls, logtype):
+        cls.LOGGER = logging.getLogger(logtype)
+        return cls.LOGGER
