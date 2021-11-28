@@ -22,7 +22,7 @@ class Message:
         if isinstance(encoded_response, bytes):
             json_response = encoded_response.decode(ENCODING)
             response = json.loads(json_response)
-            print(f'Получили сообщение: {json_response}')
+            # print(f'Получили сообщение: {json_response}')
             if isinstance(response, dict):
                 return response
             raise ValueError
@@ -44,4 +44,4 @@ class Message:
         js_message = json.dumps(message)
         encoded_message = js_message.encode(ENCODING)
         socketto.send(encoded_message)
-        print(f'Послали сообщение: {js_message}')
+        # print(f'Послали сообщение: {js_message}')

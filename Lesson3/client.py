@@ -3,10 +3,12 @@
 import sys
 import json
 import time
+import logs.config_client_log
+from errors import ReqFieldMissingError
 from common.variables import ACTION, PRESENCE, TIME, USER, ACCOUNT_NAME, \
     RESPONSE, ERROR, DEFAULT_IP_ADDRESS, DEFAULT_PORT
 from transport import Transport
-
+import logging
 
 class Client(Transport):
     """
@@ -14,9 +16,10 @@ class Client(Transport):
     """
 
     def __init__(self, ipaddress, port):
+        self.LOGGER = Transport.set_logger_type('client')
         super().__init__(ipaddress, port)
         self.ipaddress = self.ipaddress or DEFAULT_IP_ADDRESS
-        print(f'Отсылаем сообщения по адресу {self.ipaddress} на порт {self.port}')
+        self.LOGGER.info(f'Отсылаем сообщения по адресу {self.ipaddress} на порт {self.port}')
 
     def init(self):
         """
@@ -26,12 +29,11 @@ class Client(Transport):
         try:
             self.socket.connect((self.ipaddress, self.port,))
         except ConnectionRefusedError:
-            print(f'Не удалось соединиться с сервером по адресу {self.ipaddress} на порту {self.port}')
+            self.LOGGER.critical(f'Не удалось соединиться с сервером по адресу {self.ipaddress} на порту {self.port}')
             return -1
-        print(f'Клиент соединился с сервером {self.socket}')
+        self.LOGGER.info(f'Клиент соединился с сервером {self.socket}')
 
-    @staticmethod
-    def create_presence(account_name='Guest'):
+    def create_presence(self, account_name='Guest'):
         '''
         Функция генерирует запрос о присутствии клиента
         :param account_name:
@@ -44,15 +46,16 @@ class Client(Transport):
                 ACCOUNT_NAME: account_name
             }
         }
+        self.LOGGER.debug(f'Сформировано {PRESENCE} сообщение для пользователя {account_name}')
         return out
 
-    @staticmethod
-    def process_message(message):
+    def process_message(self,message):
         '''
         Функция разбирает ответ сервера
         :param message:
         :return:
         '''
+        self.LOGGER.debug(f'Разбор сообщения от сервера: {message}')
         if RESPONSE in message:
             if message[RESPONSE] == 200:
                 return '200 : OK'
@@ -66,11 +69,19 @@ class Client(Transport):
         '''
         message_to_server = self.create_presence()
         self.send(self.socket, message_to_server)
+        self.LOGGER.info(f'Послалали сообщение на сервер {message_to_server}')
         try:
             answer = self.process_message(self.get(self.socket))
-            print(answer)
+            self.LOGGER.info(f'Принят ответ от сервера {answer}')
+            # print(answer)
         except (ValueError, json.JSONDecodeError):
-            print('Не удалось декодировать сообщение сервера.')
+            self.LOGGER.error('Не удалось декодировать сообщение сервера.')
+        except ConnectionRefusedError:
+            self.LOGGER.critical(f'Не удалось подключиться к серверу {self.ipaddress}:{self.port}, '
+                                   f'конечный компьютер отверг запрос на подключение.')
+        except ReqFieldMissingError as missing_error:
+            self.LOGGER.error(f'В ответе сервера отсутствует необходимое поле '
+                                f'{missing_error.missing_field}')
 
 
 def main():

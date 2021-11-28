@@ -1,3 +1,5 @@
+import logging
+
 """Константы"""
 
 # Порт поумолчанию для сетевого ваимодействия
@@ -22,3 +24,7 @@ PRESENCE = 'presence'
 RESPONSE = 'response'
 ERROR = 'error'
 RESPONDEFAULT_IP_ADDRESSSE = 'respondefault_ip_addressse'
+
+
+# Текущий уровень логирования
+LOGGING_LEVEL = logging.DEBUG
