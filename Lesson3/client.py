@@ -9,6 +9,8 @@ from common.variables import ACTION, PRESENCE, TIME, USER, ACCOUNT_NAME, \
     RESPONSE, ERROR, DEFAULT_IP_ADDRESS, DEFAULT_PORT
 from transport import Transport
 import logging
+from decorators import logc
+
 
 class Client(Transport):
     """
@@ -21,6 +23,7 @@ class Client(Transport):
         self.ipaddress = self.ipaddress or DEFAULT_IP_ADDRESS
         self.LOGGER.info(f'Отсылаем сообщения по адресу {self.ipaddress} на порт {self.port}')
 
+    @logc
     def init(self):
         """
         Метод инициализации клиента
@@ -33,6 +36,7 @@ class Client(Transport):
             return -1
         self.LOGGER.info(f'Клиент соединился с сервером {self.socket}')
 
+    @logc
     def create_presence(self, account_name='Guest'):
         '''
         Функция генерирует запрос о присутствии клиента
@@ -49,6 +53,7 @@ class Client(Transport):
         self.LOGGER.debug(f'Сформировано {PRESENCE} сообщение для пользователя {account_name}')
         return out
 
+    @logc
     def process_message(self,message):
         '''
         Функция разбирает ответ сервера
@@ -62,6 +67,7 @@ class Client(Transport):
             return f'400 : {message[ERROR]}'
         raise ValueError
 
+    @logc
     def run(self):
         '''
             Обработчик событий от сервера

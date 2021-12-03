@@ -9,6 +9,7 @@ from common.variables import ACTION, ACCOUNT_NAME, RESPONSE, MAX_CONNECTIONS, \
     PRESENCE, TIME, USER, ERROR, DEFAULT_PORT, RESPONDEFAULT_IP_ADDRESSSE
 from transport import Transport
 import logging
+from decorators import log, logc
 
 class Server(Transport):
     """
@@ -20,12 +21,14 @@ class Server(Transport):
         super().__init__(ipaddress, port)
         self.LOGGER.info(f'Сервер подключаем по адресу {ipaddress} на порту {port}')
 
+    @logc
     def init(self):
         self.socket.bind(self.connectstring)
         # Слушаем порт
         self.socket.listen(MAX_CONNECTIONS)
         self.LOGGER.info('Сервер начал слушать порт')
 
+    @logc
     def process_message(self, message):
         '''
         Обработчик сообщений от клиентов, принимает словарь -
@@ -48,6 +51,7 @@ class Server(Transport):
             ERROR: 'Bad Request'
         }
 
+    @logc
     def run(self):
         '''
         Обработчик событий от клиента
