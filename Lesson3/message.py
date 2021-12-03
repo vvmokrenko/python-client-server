@@ -2,7 +2,7 @@
 
 import json
 from common.variables import MAX_PACKAGE_LENGTH, ENCODING
-
+from decorators import log
 
 
 class Message:
@@ -10,6 +10,7 @@ class Message:
     Класс для отсылки и полуения сообщений
     """
     @staticmethod
+    @log
     def get(socketfrom):
         '''
         Утилита приёма и декодирования сообщения
@@ -29,6 +30,7 @@ class Message:
         raise ValueError
 
     @staticmethod
+    @log
     def send(socketto, message):
         '''
         Утилита кодирования и отправки сообщения
