@@ -1,15 +1,15 @@
 """Программа-сервер"""
 
 import sys
-import json
 import time
 import logs.config_server_log
-from errors import IncorrectDataRecivedError
-from common.variables import ACTION, ACCOUNT_NAME, RESPONSE, MAX_CONNECTIONS, \
-    PRESENCE, TIME, USER, ERROR, DEFAULT_PORT, RESPONDEFAULT_IP_ADDRESSSE
+from common.variables import DEFAULT_PORT, MAX_CONNECTIONS, ACTION, TIME, USER, \
+    ACCOUNT_NAME, SENDER, PRESENCE, RESPONSE, ERROR, MESSAGE, MESSAGE_TEXT
 from transport import Transport
-import logging
 from decorators import log, logc
+import select
+import argparse
+
 
 class Server(Transport):
     """
@@ -24,12 +24,15 @@ class Server(Transport):
     @logc
     def init(self):
         self.socket.bind(self.connectstring)
+        self.socket.settimeout(0.5)
         # Слушаем порт
         self.socket.listen(MAX_CONNECTIONS)
         self.LOGGER.info('Сервер начал слушать порт')
+        self.clients = []
+        self.messages = []
 
     @logc
-    def process_message(self, message):
+    def process_message(self, message, messages_list, client):
         '''
         Обработчик сообщений от клиентов, принимает словарь -
         сообщение от клинта, проверяет корректность,
@@ -39,17 +42,23 @@ class Server(Transport):
         :return:
         '''
         self.LOGGER.debug(f'Разбор сообщения от клиента : {message}')
+        # Если это сообщение о присутствии, принимаем и отвечаем, если успех
         if ACTION in message and message[ACTION] == PRESENCE and TIME in message \
                 and USER in message and message[USER][ACCOUNT_NAME] == 'Guest':
-
-            if not isinstance(message['time'], float):
-                raise TypeError
-
-            return {RESPONSE: 200}
-        return {
-            RESPONSE: 400,
-            ERROR: 'Bad Request'
-        }
+            self.send(client, {RESPONSE: 200})
+            return
+        # Если это сообщение, то добавляем его в очередь сообщений. Ответ не требуется.
+        elif ACTION in message and message[ACTION] == MESSAGE and \
+                TIME in message and MESSAGE_TEXT in message:
+            messages_list.append((message[ACCOUNT_NAME], message[MESSAGE_TEXT]))
+            return
+        # Иначе отдаём Bad request
+        else:
+            self.send(client, {
+                RESPONSE: 400,
+                ERROR: 'Bad Request'
+            })
+            return
 
     @logc
     def run(self):
@@ -58,56 +67,71 @@ class Server(Transport):
         :return:
         '''
         while True:
-            client, client_address = self.socket.accept()
-            self.LOGGER.info(f'Установлено соедение с ПК {client_address}')
+            # Ждём подключения, если таймаут вышел, ловим исключение.
             try:
-                message_from_client = self.get(client)
-                self.LOGGER.debug(f'Получено сообщение {message_from_client}')
-                response = self.process_message(message_from_client)
-                self.LOGGER.info(f'Сформирован ответ клиенту {response}')
-                self.send(client, response)
-                self.LOGGER.debug(f'Соединение с клиентом {client_address} закрывается.')
-                client.close()
-            except (ValueError, json.JSONDecodeError):
-                self.LOGGER.error('Принято некорретное сообщение от клиента.'
-                                    f'Соединение закрывается.')
-                client.close()
-            except IncorrectDataRecivedError:
-                self.LOGGER.error(f'От клиента приняты некорректные данные. '
-                                    f'Соединение закрывается.')
-                client.close()
+                client, client_address = self.socket.accept()
+            except OSError:
+                pass
+            else:
+                self.LOGGER.info(f'Установлено соедение с ПК {client_address}')
+                # Добавляем клиента в список в конец
+                self.clients.append(client)
+
+            recv_data_lst = []
+            send_data_lst = []
+            err_lst = []
+            # Проверяем на наличие ждущих клиентов
+            try:
+                if self.clients:
+                    recv_data_lst, send_data_lst, err_lst = select.select(self.clients, self.clients, [], 0)
+            except OSError:
+                pass
+
+            # принимаем сообщения и если там есть сообщения,
+            # кладём в словарь, если ошибка, исключаем клиента.
+            if recv_data_lst:
+                for client_with_message in recv_data_lst:
+                    try:
+                        self.process_message(self.get(client_with_message),
+                                             self.messages, client_with_message)
+                    except:
+                        self.LOGGER.info(f'Клиент {client_with_message.getpeername()} '
+                                    f'отключился от сервера.')
+                        self.clients.remove(client_with_message)
+
+            # Если есть сообщения для отправки и ожидающие клиенты, отправляем им сообщение.
+            if self.messages and send_data_lst:
+                message = {
+                    ACTION: MESSAGE,
+                    SENDER: self.messages[0][0],
+                    TIME: time.time(),
+                    MESSAGE_TEXT: self.messages[0][1]
+                }
+                del self.messages[0]
+                for waiting_client in send_data_lst:
+                    try:
+                        self.send(waiting_client, message)
+                    except:
+                        self.LOGGER.info(f'Клиент {waiting_client.getpeername()} отключился от сервера.')
+                        waiting_client.close()
+                        self.clients.remove(waiting_client)
+
+    @staticmethod
+    @log
+    def arg_parser():
+        """Парсер аргументов коммандной строки"""
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-p', default=DEFAULT_PORT, type=int, nargs='?')
+        parser.add_argument('-a', default='', nargs='?')
+        namespace = parser.parse_args(sys.argv[1:])
+        listen_address = namespace.a
+        listen_port = namespace.p
+        return listen_address, listen_port
 
 
 def main():
-    '''
-    Загрузка параметров командной строки, если нет параметров, то задаём значения по умоланию.
-    Делаем проверку на IndexError.
-    Проеверки на ValueError будут внутри классов.
-    Сначала обрабатываем порт:
-    server.py -p 8888 -a 127.0.0.1
-    :return:
-    '''
-
-    try:
-        if '-p' in sys.argv:
-            listen_port = int(sys.argv[sys.argv.index('-p') + 1])
-        else:
-            listen_port = DEFAULT_PORT
-    except IndexError:
-        self.LOGGER.error('После параметра -\'p\' необходимо указать номер порта.')
-        sys.exit(1)
-
-    # Затем загружаем какой адрес слушать
-    try:
-        if '-a' in sys.argv:
-            listen_address = sys.argv[sys.argv.index('-a') + 1]
-        else:
-            listen_address = ''
-    except IndexError:
-        self.LOGGER.error(
-            'После параметра \'a\'- необходимо указать адрес, который будет слушать сервер.')
-        sys.exit(1)
-
+    """Загрузка параметров командной строки, если нет параметров, то задаём значения по умоланию"""
+    listen_address, listen_port = Server.arg_parser()
     # Готовим сервер
     srv = Server(listen_address, listen_port)
     # Если не прошли проверку на ValueError выходим из программы

@@ -6,11 +6,12 @@ from abc import ABC, abstractmethod
 from message import Message
 import logging
 
+
 class Transport(ABC):
     """
     Класс определеят общие свойства и методы для клиента и сервера.
     """
-    LOGGER = logging.getLogger('') # инициализируем атрибут класса
+    LOGGER = logging.getLogger('')  # инициализируем атрибут класса
 
     # валидируем значения порта
     def __new__(cls, *args, **kwargs):
