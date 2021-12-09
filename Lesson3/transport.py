@@ -5,6 +5,8 @@ import socket
 from abc import ABC, abstractmethod
 from message import Message
 import logging
+import time
+from common.variables import ACTION, TIME, ACCOUNT_NAME, EXIT
 
 
 class Transport(ABC):
@@ -77,3 +79,20 @@ class Transport(ABC):
     def set_logger_type(cls, logtype):
         cls.LOGGER = logging.getLogger(logtype)
         return cls.LOGGER
+
+    @staticmethod
+    def create_exit_message(account_name):
+        """Функция создаёт словарь с сообщением о выходе"""
+        return {
+            ACTION: EXIT,
+            TIME: time.time(),
+            ACCOUNT_NAME: account_name
+        }
+
+    @staticmethod
+    def print_help():
+        """Функция выводящяя справку по использованию"""
+        print('Поддерживаемые команды:')
+        print('message - отправить сообщение. Кому и текст будет запрошены отдельно.')
+        print('help - вывести подсказки по командам')
+        print('exit - выход из программы')
